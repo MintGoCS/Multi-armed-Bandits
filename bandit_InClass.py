@@ -21,6 +21,7 @@ class Lever:
         reward = np.random.normal(self.mu, self.sd)
         self.rewards.append(reward)
         self.Na += 1
+
         if alpha is None:
             self.Qa = self.Qa + (1/self.Na) * (reward - self.Qa)
         else:
@@ -72,9 +73,9 @@ def run_greedy(nlevers=4, epsilon=0.1, iterations=2000):
 
     total_rewards = sum([sum(l.rewards) for l in levers])
 
-    plotlevers(levers)
-    for i in levers:
-        print("mu=", i.mu, ", Qa=", i.Qa, ", Na=", i.Na, sep=" ")
+    # plotlevers(levers)
+    # for i in levers:
+    #     print("mu=", i.mu, ", Qa=", i.Qa, ", Na=", i.Na, sep=" ")
 
     return total_rewards
 
@@ -99,11 +100,12 @@ def run_optimistic(nlevers=4, initial_qa=5, epsilon=0.1, iterations=2000):
 
     total_rewards = sum([sum(l.rewards) for l in levers])
 
-    plotlevers(levers)
-    for i in levers:
-        print("mu=", i.mu, ", Qa=", i.Qa, ", Na=", i.Na, sep=" ")
+    # plotlevers(levers)
+    # for i in levers:
+    #     print("mu=", i.mu, ", Qa=", i.Qa, ", Na=", i.Na, sep=" ")
 
     return total_rewards
+
 
 def run_ucb(nlevers=4, c=1, iterations=2000):
     levers = []
@@ -126,28 +128,73 @@ def run_ucb(nlevers=4, c=1, iterations=2000):
 
     total_rewards = sum([sum(l.rewards) for l in levers])
 
-    plotlevers(levers)
-    for i in levers:
-        print("mu=", i.mu, ", Qa=", i.Qa, ", Na=", i.Na, sep=" ")
+    # plotlevers(levers)
+    # for i in levers:
+    #     print("mu=", i.mu, ", Qa=", i.Qa, ", Na=", i.Na, sep=" ")
 
     return total_rewards
 
-def run_gradient_bandit(nlevers=4, epsilon=0.1, iterations=2000):
+
+def run_gradient_bandit(nlevers=4, alpha=0.1, iterations=2000):
     levers = []
     for i in range(nlevers):
         l = Lever()
         levers.append(l)
 
-    soft_max = np.exp(levers[1].Ha)/ sum([sum(l.Ha) for l in levers])
+    avg_reward = 0
+    for t in range(1, iterations + 1):
+        # Applied softmax function for each lever
+        # e^H(a1)/sum(e^H(a1) + e^H(a2) + e^H(a3) + ...)
+        sum_exp_Ha = sum(np.exp(l.Ha) for l in levers)
+        softmax_probs = [np.exp(l.Ha) / sum_exp_Ha for l in levers]
+        softmax_probs = np.array(softmax_probs).flatten()
 
+        selected_lever_index = np.random.choice(nlevers, p=softmax_probs)
+        selected_lever = levers[selected_lever_index]
+
+        # Get reward
+        reward = selected_lever.act()
+        # Update average reward
+        avg_reward += (reward - avg_reward) / t
+
+        # Update preference Ha value
+        for i, l in enumerate(levers):
+            if i == selected_lever_index:
+                l.Ha += alpha * (reward - avg_reward) * (1 - softmax_probs[i])
+            else:
+                l.Ha -= alpha * (reward - avg_reward) * softmax_probs[i]
+
+    # for i in levers:
+    #     print("mu=", i.mu, ", Ha=", i.Ha, ", Na=", i.Na, sep=" ")
+
+    total_rewards = sum([sum(l.rewards) for l in levers])
+    return total_rewards
 
 
 if __name__ == '__main__':
+    times = 2000
     print("Running results...")
-    print("\nGreedy Method...")
-    avg_greedy = run_greedy()
-    print("\nOptimistic Method...")
-    avg_optimistic = run_optimistic()
-    print("\nUpper-Confidence-Bound Method...")
-    avg_ucb = run_ucb()
 
+    print("\nGreedy Method...")
+    sum_rewards = 0
+    for i in range(times):
+        sum_rewards += run_greedy()
+    print(f"Average reward over 2000 runs: {sum_rewards/times}.")
+    # --------------------------------------------------------------
+    print("\nOptimistic Method...")
+    sum_rewards = 0
+    for i in range(times):
+        sum_rewards += run_optimistic()
+    print(f"Average reward over 2000 runs: {sum_rewards/times}.")
+    # --------------------------------------------------------------
+    print("\nUpper-Confidence-Bound Method...")
+    sum_rewards = 0
+    for i in range(times):
+        sum_rewards += run_ucb()
+    print(f"Average reward over 2000 runs: {sum_rewards/times}.")
+    # --------------------------------------------------------------
+    print("\nGradient Bandit Method...")
+    sum_rewards = 0
+    for i in range(times):
+        sum_rewards += run_gradient_bandit()
+    print(f"Average reward over 2000 runs: {sum_rewards/times}.")
